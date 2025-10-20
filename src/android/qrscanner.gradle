@@ -1,5 +1,7 @@
 repositories {
-    jcenter()
+    // jcenter()    // <--- depricated
+    google()
+    mavenCentral()
 }
 
 dependencies {

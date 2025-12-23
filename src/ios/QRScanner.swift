@@ -29,8 +29,11 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
                     layer.frame = self.bounds;
                 }
             }
-            
-            self.videoPreviewLayer?.connection?.videoOrientation = interfaceOrientationToVideoOrientation(UIApplication.shared.statusBarOrientation);
+                        
+            if let scene = self.window?.windowScene {
+                self.videoPreviewLayer?.connection?.videoOrientation =
+                    interfaceOrientationToVideoOrientation(scene.interfaceOrientation)
+            }
         }
         
         
@@ -92,7 +95,7 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
     }
 
     func sendErrorCode(command: CDVInvokedUrlCommand, error: QRScannerError){
-        let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR, messageAs: error.rawValue)
+        let pluginResult = CDVPluginResult(status: CDVCommandStatus.error, messageAs: error.rawValue)
         commandDelegate!.send(pluginResult, callbackId:command.callbackId)
     }
 
@@ -241,17 +244,32 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
 
     // This method processes metadataObjects captured by iOS.
     func metadataOutput(_ captureOutput: AVCaptureMetadataOutput, didOutput metadataObjects: [AVMetadataObject], from connection: AVCaptureConnection) {
-        if metadataObjects.count == 0 || scanning == false {
-            // while nothing is detected, or if scanning is false, do nothing.
+
+        if metadataObjects.isEmpty || scanning == false {
             return
         }
-        let found = metadataObjects[0] as! AVMetadataMachineReadableCodeObject
-        if found.type == AVMetadataObject.ObjectType.qr && found.stringValue != nil {
-            scanning = false
-            let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: found.stringValue)
-            commandDelegate!.send(pluginResult, callbackId: nextScanningCommand?.callbackId!)
-            nextScanningCommand = nil
+        
+        guard let found = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
+            found.type == AVMetadataObject.ObjectType.qr,
+            let stringValue = found.stringValue,
+            let command = nextScanningCommand,
+            let commandDelegate = commandDelegate else {
+            return
         }
+
+        scanning = false
+
+        let pluginResult = CDVPluginResult(
+            status: CDVCommandStatus.ok,
+            messageAs: stringValue
+        )
+
+        commandDelegate.send(
+            pluginResult,
+            callbackId: command.callbackId
+        )
+
+        nextScanningCommand = nil
     }
 
     @objc func pageDidLoad() {
@@ -470,7 +488,7 @@ class QRScanner : CDVPlugin, AVCaptureMetadataOutputObjectsDelegate {
             "currentCamera": String(currentCamera)
         ]
 
-        let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK, messageAs: status)
+        let pluginResult = CDVPluginResult(status: CDVCommandStatus.ok, messageAs: status)
         commandDelegate!.send(pluginResult, callbackId:command.callbackId)
     }
 
